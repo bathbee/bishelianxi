@@ -106,85 +106,14 @@ app.get('/api/recommend', async (req, res) => {
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
 
-        // 获取用户健康信息
-        const [userAnswers] = await pool.execute(`
-            SELECT q.id, sa.answer 
-            FROM survey_answers sa
-            JOIN questions q ON sa.question_id = q.id
-            WHERE user_id = ?
-        `, [decoded.userId]);
+        // 直接从 recipes 表中随机选取一个食谱
+        const [recipes] = await pool.execute('SELECT * FROM recipes ORDER BY RAND() LIMIT 1');
 
-        // 解析用户特征
-        const userFeatures = {
-            diseases: [],          // 疾病列表
-            allergies: [],         // 过敏食材
-            healthGoals: [],       // 健康目标
-            forbiddenFoods: [],    // 需减少的食物
-            dietType: '混合饮食',   // 默认饮食类型
-            age: 25                // 默认年龄
-        };
-
-        userAnswers.forEach(a => {
-            switch (a.id) {
-                case 4: if (a.answer === '是') userFeatures.diseases.push('糖尿病'); break;
-                case 5: if (a.answer === '是') userFeatures.diseases.push('高血压'); break;
-                case 7:
-                    if (a.answer !== '否') {
-                        userFeatures.allergies = a.answer.split(/，|,/);
-                    }
-                    break;
-                case 19: userFeatures.healthGoals = a.answer.split(/，|,/); break;
-                case 20: userFeatures.forbiddenFoods = a.answer.split(/，|,/); break;
-                case 11: userFeatures.dietType = a.answer; break;
-                case 3: userFeatures.age = parseInt(a.answer) || 25; break;
-            }
-        });
-
-        // 构建查询条件
-        let query = `SELECT * FROM recipes WHERE 1=1`;
-        const params = [];
-
-        // 疾病过滤
-        if (userFeatures.diseases.length > 0) {
-            query += ` AND JSON_OVERLAPS(suitable_diseases, ?)`;
-            params.push(JSON.stringify(userFeatures.diseases));
-        }
-
-        // 过敏过滤
-        if (userFeatures.allergies.length > 0) {
-            query += ` AND NOT JSON_OVERLAPS(ingredients, ?)`;
-            params.push(JSON.stringify(userFeatures.allergies));
-        }
-
-        // 健康目标匹配
-        if (userFeatures.healthGoals.length > 0) {
-            query += ` AND JSON_OVERLAPS(health_goals, ?)`;
-            params.push(JSON.stringify(userFeatures.healthGoals));
-        }
-
-        // 执行查询
-        let [recipes] = await pool.execute(query, params);
-
-        // 如果没有符合条件的食谱，放宽条件，只根据过敏信息筛选
-        if (recipes.length === 0 && userFeatures.allergies.length > 0) {
-            query = `SELECT * FROM recipes WHERE NOT JSON_OVERLAPS(ingredients, ?)`;
-            [recipes] = await pool.execute(query, [JSON.stringify(userFeatures.allergies)]);
-        }
-
-        // 如果还是没有符合条件的食谱，返回所有食谱
         if (recipes.length === 0) {
-            [recipes] = await pool.execute(`SELECT * FROM recipes`);
+            return res.status(404).json({ error: '未找到食谱' });
         }
 
-        // 根据年龄调整推荐排序
-        const sortedRecipes = recipes.sort((a, b) => {
-            const ageFactor = userFeatures.age < 50 ? a.calories - b.calories : b.calories - a.calories;
-            return ageFactor || b.create_time.localeCompare(a.create_time);
-        });
-
-        console.log('推荐的食谱数量:', sortedRecipes.length);
-
-        res.json(sortedRecipes.slice(0, 12)); // 返回前12个推荐结果
+        res.json(recipes[0]);
 
     } catch (error) {
         console.error('推荐失败:', error);
