@@ -97,6 +97,7 @@ app.post('/api/survey', async (req, res) => {
         res.status(401).json({ error: '无效令牌' });
     }
 });
+
 // 新增推荐接口
 app.get('/api/recommend', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
@@ -190,5 +191,6 @@ app.get('/api/recommend', async (req, res) => {
         res.status(500).json({ error: '推荐服务暂不可用' });
     }
 });
+
 const PORT = 3000;
 app.listen(PORT, () => console.log(`后端运行在 http://localhost:${PORT}`));
