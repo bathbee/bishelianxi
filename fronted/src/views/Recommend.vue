@@ -64,6 +64,8 @@
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
       });
+      // 打印日志，方便调试
+      console.log('推荐的食谱数据:', response.data);
       recipes.value = response.data;
     } catch (error) {
       console.error('获取推荐失败:', error);
