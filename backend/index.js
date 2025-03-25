@@ -162,7 +162,18 @@ app.get('/api/recommend', async (req, res) => {
         }
 
         // 执行查询
-        const [recipes] = await pool.execute(query, params);
+        let [recipes] = await pool.execute(query, params);
+
+        // 如果没有符合条件的食谱，放宽条件，只根据过敏信息筛选
+        if (recipes.length === 0 && userFeatures.allergies.length > 0) {
+            query = `SELECT * FROM recipes WHERE NOT JSON_OVERLAPS(ingredients, ?)`;
+            [recipes] = await pool.execute(query, [JSON.stringify(userFeatures.allergies)]);
+        }
+
+        // 如果还是没有符合条件的食谱，返回所有食谱
+        if (recipes.length === 0) {
+            [recipes] = await pool.execute(`SELECT * FROM recipes`);
+        }
 
         // 根据年龄调整推荐排序
         const sortedRecipes = recipes.sort((a, b) => {
@@ -170,7 +181,6 @@ app.get('/api/recommend', async (req, res) => {
             return ageFactor || b.create_time.localeCompare(a.create_time);
         });
 
-        // 打印日志，方便调试
         console.log('推荐的食谱数量:', sortedRecipes.length);
 
         res.json(sortedRecipes.slice(0, 12)); // 返回前12个推荐结果
