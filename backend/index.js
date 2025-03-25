@@ -107,11 +107,11 @@ app.get('/api/recommend', async (req, res) => {
 
         // 获取用户健康信息
         const [userAnswers] = await pool.execute(`
-        SELECT q.id, sa.answer 
-        FROM survey_answers sa
-        JOIN questions q ON sa.question_id = q.id
-        WHERE user_id = ?
-      `, [decoded.userId]);
+            SELECT q.id, sa.answer 
+            FROM survey_answers sa
+            JOIN questions q ON sa.question_id = q.id
+            WHERE user_id = ?
+        `, [decoded.userId]);
 
         // 解析用户特征
         const userFeatures = {
@@ -170,6 +170,9 @@ app.get('/api/recommend', async (req, res) => {
             return ageFactor || b.create_time.localeCompare(a.create_time);
         });
 
+        // 打印日志，方便调试
+        console.log('推荐的食谱数量:', sortedRecipes.length);
+
         res.json(sortedRecipes.slice(0, 12)); // 返回前12个推荐结果
 
     } catch (error) {
@@ -177,6 +180,5 @@ app.get('/api/recommend', async (req, res) => {
         res.status(500).json({ error: '推荐服务暂不可用' });
     }
 });
-
 const PORT = 3000;
 app.listen(PORT, () => console.log(`后端运行在 http://localhost:${PORT}`));
